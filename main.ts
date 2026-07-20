@@ -1,7 +1,3 @@
-const isLetter = (char: string) => /^[a-z0-1]$/.test(char); // accepts lowercase letters
-const isSymbol = (char: string) => /(ε|\(|\)|\+|\*)/.test(char); // accepted symbols: "ε", "(", ")", "+" and "*"
-const isValid = (char: string) => isLetter(char) || isSymbol(char);
-
 enum ParserNodeType {
     Star = 'Star',
     Concat = 'Concat',
@@ -26,13 +22,17 @@ type ParserNode =
     | { type: ParserNodeType.Concat; nodes: ParserNode[] }
     | { type: ParserNodeType.Paren; node: ParserNode; isClosed: boolean }
     | { type: ParserNodeType.Union; fstNode: ParserNode; sndNode: ParserNode }
-    | { type: ParserNodeType.Char; token: string };
+    | { type: ParserNodeType.Char; char: string };
 
 type ASTNode =
     | { type: ASTNodeType.Star; node: ASTNode }
     | { type: ASTNodeType.Concat; nodes: ASTNode[] }
     | { type: ASTNodeType.Union; fstNode: ASTNode; sndNode: ASTNode }
     | string;
+
+const isLetter = (char: string) => /^[a-z0-1]$/.test(char); // accepts lowercase letters
+const isSymbol = (char: string) => /(ε|\(|\)|\+|\*)/.test(char); // accepted symbols: "ε", "(", ")", "+" and "*"
+const isValid = (char: string) => isLetter(char) || isSymbol(char);
 
 const tokenizer = (input: string): TokenizerOutput =>
     input
@@ -92,6 +92,8 @@ const appendNode = (tree: ParserNode, newNode: ParserNode): ParserNode => {
             return newNode;
 
         case ParserNodeType.Char:
+            return { type: ParserNodeType.Concat, nodes: [tree, newNode] };
+
         case ParserNodeType.Star:
             return { type: ParserNodeType.Concat, nodes: [tree, newNode] };
 
@@ -127,157 +129,131 @@ const appendNode = (tree: ParserNode, newNode: ParserNode): ParserNode => {
     }
 };
 
-const starNode = (tree: ParserNode): ParserNode => {
-    switch (tree?.type) {
-        case undefined:
-        case ParserNodeType.Star:
-            return tree;
-
-        case ParserNodeType.Char:
-            return { type: ParserNodeType.Star, node: tree };
-
-        case ParserNodeType.Concat:
-            return {
-                type: ParserNodeType.Concat,
-                nodes: [
-                    ...tree.nodes.slice(0, -1),
-                    starNode(tree.nodes.at(-1)),
-                ],
-            };
-
-        case ParserNodeType.Paren:
-            if (tree.isClosed) {
-                return { type: ParserNodeType.Star, node: tree };
-            } else {
-                return {
-                    type: ParserNodeType.Paren,
-                    node: starNode(tree.node),
-                    isClosed: false,
-                };
-            }
-
-        case ParserNodeType.Union:
-            return {
-                type: ParserNodeType.Union,
-                fstNode: tree.fstNode,
-                sndNode: starNode(tree.sndNode),
-            };
-    }
-};
-
-const unionNode = (tree: ParserNode): ParserNode => {
-    switch (tree?.type) {
-        case undefined:
-            return tree;
-
-        case ParserNodeType.Char:
-        case ParserNodeType.Star:
-        case ParserNodeType.Union:
-            return {
-                type: ParserNodeType.Union,
-                fstNode: tree,
-                sndNode: undefined,
-            };
-
-        case ParserNodeType.Concat:
-            return {
-                type: ParserNodeType.Concat,
-                nodes: [
-                    ...tree.nodes.slice(0, -1),
-                    unionNode(tree.nodes.at(-1)),
-                ],
-            };
-
-        case ParserNodeType.Paren: {
-            if (tree.isClosed) {
-                return {
-                    type: ParserNodeType.Union,
-                    fstNode: tree,
-                    sndNode: undefined,
-                };
-            } else {
-                return {
-                    type: ParserNodeType.Paren,
-                    node: unionNode(tree.node),
-                    isClosed: false,
-                };
-            }
-        }
-    }
-};
-
-const closeParen = (tree: ParserNode): ParserNode => {
-    switch (tree?.type) {
-        case undefined:
-        case ParserNodeType.Char:
-        case ParserNodeType.Star:
-            return tree;
-
-        case ParserNodeType.Union:
-            return {
-                type: ParserNodeType.Union,
-                fstNode: tree.fstNode,
-                sndNode: closeParen(tree.sndNode),
-            };
-
-        case ParserNodeType.Concat:
-            return {
-                type: ParserNodeType.Concat,
-                nodes: [
-                    ...tree.nodes.slice(0, -1),
-                    closeParen(tree.nodes.at(-1)),
-                ],
-            };
-
-        case ParserNodeType.Paren: {
-            if (tree.isClosed) {
-                return tree;
-            } else {
-                if (hasOpenParen(tree.node)) {
-                    return { ...tree, node: closeParen(tree.node) };
-                } else {
-                    return { ...tree, isClosed: true };
+// the token string should always be of length 1
+const parser = (tree: ParserNode, token: string): ParserNode => {
+    switch (token) {
+        case '+': {
+            switch (tree?.type) {
+                case ParserNodeType.Paren: {
+                    return tree.isClosed ?
+                            {
+                                type: ParserNodeType.Union,
+                                fstNode: tree,
+                                sndNode: undefined,
+                            }
+                        :   {
+                                type: ParserNodeType.Paren,
+                                node: parser(tree.node, '+'),
+                                isClosed: false,
+                            };
                 }
+
+                case ParserNodeType.Concat:
+                    return {
+                        type: ParserNodeType.Concat,
+                        nodes: [
+                            ...tree.nodes.slice(0, -1),
+                            parser(tree.nodes.at(-1), '+'),
+                        ],
+                    };
             }
+
+            // if tree is undefined or type is "Star", "Char", or "Union"
+            return tree !== undefined ?
+                    {
+                        type: ParserNodeType.Union,
+                        fstNode: tree,
+                        sndNode: undefined,
+                    }
+                :   tree;
+        }
+
+        case '*': {
+            switch (tree?.type) {
+                case ParserNodeType.Paren:
+                    return tree.isClosed ?
+                            { type: ParserNodeType.Star, node: tree }
+                        :   {
+                                type: ParserNodeType.Paren,
+                                node: parser(tree.node, '*'),
+                                isClosed: false,
+                            };
+
+                case ParserNodeType.Concat:
+                    return {
+                        type: ParserNodeType.Concat,
+                        nodes: [
+                            ...tree.nodes.slice(0, -1),
+                            parser(tree.nodes.at(-1), '*'),
+                        ],
+                    };
+
+                case ParserNodeType.Union:
+                    return {
+                        type: ParserNodeType.Union,
+                        fstNode: tree.fstNode,
+                        sndNode: parser(tree.sndNode, '*'),
+                    };
+            }
+
+            // if tree is undefined or type is "Star" or "Char"
+            return tree !== undefined ?
+                    { type: ParserNodeType.Star, node: tree }
+                :   tree;
+        }
+
+        case ')': {
+            switch (tree?.type) {
+                case ParserNodeType.Paren: {
+                    return (
+                        tree.isClosed ? tree
+                        : hasOpenParen(tree.node) ?
+                            { ...tree, node: parser(tree.node, ')') }
+                        :   { ...tree, isClosed: true }
+                    );
+                }
+
+                case ParserNodeType.Concat:
+                    return {
+                        type: ParserNodeType.Concat,
+                        nodes: [
+                            ...tree.nodes.slice(0, -1),
+                            parser(tree.nodes.at(-1), ')'),
+                        ],
+                    };
+
+                case ParserNodeType.Union:
+                    return {
+                        type: ParserNodeType.Union,
+                        fstNode: tree.fstNode,
+                        sndNode: parser(tree.sndNode, ')'),
+                    };
+            }
+
+            // if tree is undefined or type is "Star" or "Char"
+            return tree;
+        }
+
+        case '(': {
+            return appendNode(tree, {
+                type: ParserNodeType.Paren,
+                node: undefined,
+                isClosed: false,
+            });
+        }
+
+        default: {
+            // char case: ε, a-z or 0-1
+            return appendNode(tree, {
+                type: ParserNodeType.Char,
+                char: token,
+            });
         }
     }
 };
 
-const parser = ({ tokens }: TokenizerOutput & { isValid: true }) =>
-    tokens.reduce<ParserNode>((tree, token) => {
-        // the token string should always be of length 1
-        switch (token) {
-            case '(': //
-                return appendNode(tree, {
-                    type: ParserNodeType.Paren,
-                    node: undefined,
-                    isClosed: false,
-                });
-
-            case ')':
-                return closeParen(tree);
-
-            case '+':
-                return unionNode(tree);
-
-            case '*':
-                return starNode(tree);
-
-            default: // char: ε, a-z or 0-1
-                return appendNode(tree, {
-                    type: ParserNodeType.Char,
-                    token: token,
-                });
-        }
-    }, undefined);
-
-const printTokenizerOutput = (output: TokenizerOutput) => {
-    if (output.isValid) {
-        console.log(output.tokens);
-    } else {
-        console.log(output.err);
-    }
-};
+const parserReducer = ({ tokens }: TokenizerOutput & { isValid: true }) =>
+    tokens.reduce<ParserNode>(parser, undefined);
 
 const parserNodeToString = (tree: ParserNode): string => {
     switch (tree?.type) {
@@ -285,7 +261,7 @@ const parserNodeToString = (tree: ParserNode): string => {
             return '';
 
         case ParserNodeType.Char:
-            return tree.token;
+            return tree.char;
 
         case ParserNodeType.Star:
             return `${parserNodeToString(tree.node)}*`;
@@ -303,13 +279,21 @@ const parserNodeToString = (tree: ParserNode): string => {
     }
 };
 
+const printTokenizerOutput = (output: TokenizerOutput) => {
+    if (output.isValid) {
+        console.log(output.tokens);
+    } else {
+        console.log(output.err);
+    }
+};
+
 const interpret = (input: string, withTree = false, withTokens = false) => {
     console.log(`\n${input}`);
     const tokens = tokenizer(input);
     if (withTokens) printTokenizerOutput(tokens);
 
     if (!tokens.isValid) return;
-    const parsed = parser(tokens);
+    const parsed = parserReducer(tokens);
 
     if (withTree) {
         console.log(Deno.inspect(parsed, { depth: Infinity, colors: true }));
@@ -318,14 +302,6 @@ const interpret = (input: string, withTree = false, withTokens = false) => {
     console.log(parserNodeToString(parsed), '\n');
 };
 
-interpret('(0+1)*000(0+1)*');
-interpret('b(a+b)*b');
-interpret('a + (ab) + (abb)');
-interpret('(a + (ab) + (abb))*');
-interpret('(a + b)*b(a + b)(a + b)');
-interpret('(a+b)(a+b)');
-interpret('(a + b) ( a + b )');
-interpret('(a + b)*abb');
-interpret('a*b*c*');
+interpret('(( a + (a + b) + b)* (a + b))', true);
 
-export { tokenizer, parser };
+export { tokenizer, parserReducer, ParserNodeType };
