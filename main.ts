@@ -68,6 +68,24 @@ const canAppend = (node: ParserNode): boolean => {
     }
 };
 
+const hasOpenParen = (tree: ParserNode): boolean => {
+    switch (tree?.type) {
+        case undefined:
+        case ParserNodeType.Char:
+        case ParserNodeType.Star:
+            return false;
+
+        case ParserNodeType.Union:
+            return hasOpenParen(tree.sndNode);
+
+        case ParserNodeType.Concat:
+            return hasOpenParen(tree.nodes.at(-1));
+
+        case ParserNodeType.Paren:
+            return !tree.isClosed || hasOpenParen(tree.node);
+    }
+};
+
 const appendNode = (tree: ParserNode, newNode: ParserNode): ParserNode => {
     switch (tree?.type) {
         case undefined:
@@ -185,24 +203,6 @@ const unionNode = (tree: ParserNode): ParserNode => {
                 };
             }
         }
-    }
-};
-
-const hasOpenParen = (tree: ParserNode): boolean => {
-    switch (tree?.type) {
-        case undefined:
-        case ParserNodeType.Char:
-        case ParserNodeType.Star:
-            return false;
-
-        case ParserNodeType.Union:
-            return hasOpenParen(tree.sndNode);
-
-        case ParserNodeType.Concat:
-            return hasOpenParen(tree.nodes.at(-1));
-
-        case ParserNodeType.Paren:
-            return !tree.isClosed || hasOpenParen(tree.node);
     }
 };
 
@@ -327,3 +327,5 @@ interpret('(a+b)(a+b)');
 interpret('(a + b) ( a + b )');
 interpret('(a + b)*abb');
 interpret('a*b*c*');
+
+export { tokenizer, parser };
