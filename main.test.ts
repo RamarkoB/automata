@@ -111,24 +111,24 @@ Deno.test('a + ab + abb', () => {
     const parsed = parserReducer(tokens);
     assertEquals(parsed, {
         type: ParserNodeType.Union,
-        fstNode: {
+        fstNode: { type: ParserNodeType.Char, char: 'a' },
+        sndNode: {
             type: ParserNodeType.Union,
-            fstNode: { type: ParserNodeType.Char, char: 'a' },
-            sndNode: {
+            fstNode: {
                 type: ParserNodeType.Concat,
                 nodes: [
                     { type: ParserNodeType.Char, char: 'a' },
                     { type: ParserNodeType.Char, char: 'b' },
                 ],
             },
-        },
-        sndNode: {
-            type: ParserNodeType.Concat,
-            nodes: [
-                { type: ParserNodeType.Char, char: 'a' },
-                { type: ParserNodeType.Char, char: 'b' },
-                { type: ParserNodeType.Char, char: 'b' },
-            ],
+            sndNode: {
+                type: ParserNodeType.Concat,
+                nodes: [
+                    { type: ParserNodeType.Char, char: 'a' },
+                    { type: ParserNodeType.Char, char: 'b' },
+                    { type: ParserNodeType.Char, char: 'b' },
+                ],
+            },
         },
     });
 });
@@ -158,10 +158,10 @@ Deno.test('a + (ab) + (abb)', () => {
     const parsed = parserReducer(tokens);
     assertEquals(parsed, {
         type: ParserNodeType.Union,
-        fstNode: {
+        fstNode: { type: ParserNodeType.Char, char: 'a' },
+        sndNode: {
             type: ParserNodeType.Union,
-            fstNode: { type: ParserNodeType.Char, char: 'a' },
-            sndNode: {
+            fstNode: {
                 type: ParserNodeType.Paren,
                 node: {
                     type: ParserNodeType.Concat,
@@ -172,18 +172,18 @@ Deno.test('a + (ab) + (abb)', () => {
                 },
                 isClosed: true,
             },
-        },
-        sndNode: {
-            type: ParserNodeType.Paren,
-            node: {
-                type: ParserNodeType.Concat,
-                nodes: [
-                    { type: ParserNodeType.Char, char: 'a' },
-                    { type: ParserNodeType.Char, char: 'b' },
-                    { type: ParserNodeType.Char, char: 'b' },
-                ],
+            sndNode: {
+                type: ParserNodeType.Paren,
+                node: {
+                    type: ParserNodeType.Concat,
+                    nodes: [
+                        { type: ParserNodeType.Char, char: 'a' },
+                        { type: ParserNodeType.Char, char: 'b' },
+                        { type: ParserNodeType.Char, char: 'b' },
+                    ],
+                },
+                isClosed: true,
             },
-            isClosed: true,
         },
     });
 });
@@ -220,10 +220,10 @@ Deno.test('(a + (ab) + (abb))*', () => {
             type: ParserNodeType.Paren,
             node: {
                 type: ParserNodeType.Union,
-                fstNode: {
+                fstNode: { type: ParserNodeType.Char, char: 'a' },
+                sndNode: {
                     type: ParserNodeType.Union,
-                    fstNode: { type: ParserNodeType.Char, char: 'a' },
-                    sndNode: {
+                    fstNode: {
                         type: ParserNodeType.Paren,
                         node: {
                             type: ParserNodeType.Concat,
@@ -234,18 +234,18 @@ Deno.test('(a + (ab) + (abb))*', () => {
                         },
                         isClosed: true,
                     },
-                },
-                sndNode: {
-                    type: ParserNodeType.Paren,
-                    node: {
-                        type: ParserNodeType.Concat,
-                        nodes: [
-                            { type: ParserNodeType.Char, char: 'a' },
-                            { type: ParserNodeType.Char, char: 'b' },
-                            { type: ParserNodeType.Char, char: 'b' },
-                        ],
+                    sndNode: {
+                        type: ParserNodeType.Paren,
+                        node: {
+                            type: ParserNodeType.Concat,
+                            nodes: [
+                                { type: ParserNodeType.Char, char: 'a' },
+                                { type: ParserNodeType.Char, char: 'b' },
+                                { type: ParserNodeType.Char, char: 'b' },
+                            ],
+                        },
+                        isClosed: true,
                     },
-                    isClosed: true,
                 },
             },
             isClosed: true,
@@ -421,55 +421,55 @@ Deno.test('(( a + (a + b) + b)* (a + b))', () => {
 
     const parsed = parserReducer(tokens);
     assertEquals(parsed, {
-        type: ParserNodeType.Concat,
-        nodes: [
-            {
-                type: ParserNodeType.Star,
-                node: {
-                    type: ParserNodeType.Paren,
+        type: ParserNodeType.Paren,
+        node: {
+            type: ParserNodeType.Concat,
+            nodes: [
+                {
+                    type: ParserNodeType.Star,
                     node: {
-                        type: ParserNodeType.Union,
-                        fstNode: {
-                            type: ParserNodeType.Paren,
-                            node: {
+                        type: ParserNodeType.Paren,
+                        node: {
+                            type: ParserNodeType.Union,
+                            fstNode: { type: ParserNodeType.Char, char: 'a' },
+                            sndNode: {
                                 type: ParserNodeType.Union,
                                 fstNode: {
-                                    type: ParserNodeType.Union,
-                                    fstNode: {
-                                        type: ParserNodeType.Char,
-                                        char: 'a',
-                                    },
-                                    sndNode: {
-                                        type: ParserNodeType.Paren,
-                                        node: {
+                                    type: ParserNodeType.Paren,
+                                    node: {
+                                        type: ParserNodeType.Union,
+                                        fstNode: {
                                             type: ParserNodeType.Char,
                                             char: 'a',
                                         },
-                                        isClosed: false,
+                                        sndNode: {
+                                            type: ParserNodeType.Char,
+                                            char: 'b',
+                                        },
                                     },
+                                    isClosed: true,
                                 },
                                 sndNode: {
                                     type: ParserNodeType.Char,
                                     char: 'b',
                                 },
                             },
-                            isClosed: true,
                         },
+                        isClosed: true,
+                    },
+                },
+                {
+                    type: ParserNodeType.Paren,
+                    node: {
+                        type: ParserNodeType.Union,
+                        fstNode: { type: ParserNodeType.Char, char: 'a' },
                         sndNode: { type: ParserNodeType.Char, char: 'b' },
                     },
                     isClosed: true,
                 },
-            },
-            {
-                type: ParserNodeType.Paren,
-                node: {
-                    type: ParserNodeType.Union,
-                    fstNode: { type: ParserNodeType.Char, char: 'a' },
-                    sndNode: { type: ParserNodeType.Char, char: 'b' },
-                },
-                isClosed: true,
-            },
-        ],
+            ],
+        },
+        isClosed: true,
     });
 });
 

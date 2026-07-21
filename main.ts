@@ -149,16 +149,29 @@ const parser = (tree: ParserNode, token: string): ParserNode => {
                 }
 
                 case ParserNodeType.Concat:
+                    return canAppend(tree) ?
+                            {
+                                type: ParserNodeType.Concat,
+                                nodes: [
+                                    ...tree.nodes.slice(0, -1),
+                                    parser(tree.nodes.at(-1), '+'),
+                                ],
+                            }
+                        :   {
+                                type: ParserNodeType.Union,
+                                fstNode: tree,
+                                sndNode: undefined,
+                            };
+
+                case ParserNodeType.Union:
                     return {
-                        type: ParserNodeType.Concat,
-                        nodes: [
-                            ...tree.nodes.slice(0, -1),
-                            parser(tree.nodes.at(-1), '+'),
-                        ],
+                        type: ParserNodeType.Union,
+                        fstNode: tree.fstNode,
+                        sndNode: parser(tree.sndNode, '+'),
                     };
             }
 
-            // if tree is undefined or type is "Star", "Char", or "Union"
+            // if tree is undefined or type is "Star" or "Char"
             return tree !== undefined ?
                     {
                         type: ParserNodeType.Union,
@@ -302,6 +315,18 @@ const interpret = (input: string, withTree = false, withTokens = false) => {
     console.log(parserNodeToString(parsed), '\n');
 };
 
-interpret('(( a + (a + b) + b)* (a + b))', true);
+// interpret('0+1');
+// interpret('(0+1)*000(0+1)*');
+interpret('b(a+b)*b', true);
+// interpret('a + ab + ab');
+// interpret('a + (ab) + (abb)');
+// interpret('(a + (ab) + (abb))*');
+// interpret('(a + b)*b(a + b)(a + b)');
+// interpret('(a+b)(a+b)');
+// interpret('(a + b) ( a + b )');
+// interpret('(a + b)*abb');
+// interpret('a*b*c*');
+// interpret('(( a + (a + b) + b + ab)* (a + b))');
+// interpret('(( a + b ))');
 
 export { tokenizer, parserReducer, ParserNodeType };
