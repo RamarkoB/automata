@@ -1,5 +1,11 @@
 import { assertEquals } from '@std/assert';
-import { ParserNodeType, tokenizer, parserReducer } from './main.ts';
+import {
+    ParserNodeType,
+    ASTNodeType,
+    tokenizer,
+    parserReducer,
+    simplifyAST,
+} from './main.ts';
 
 const tokenConstructor = (tokens: string[]) => ({
     isValid: true as const,
@@ -66,6 +72,36 @@ Deno.test('(0+1)*000(0+1)*', () => {
             },
         ],
     });
+
+    const simplified = simplifyAST(parsed);
+    assertEquals(simplified, {
+        type: ASTNodeType.Concat,
+        nodes: [
+            {
+                type: ASTNodeType.Star,
+                node: {
+                    type: ASTNodeType.Union,
+                    nodes: [
+                        { type: ASTNodeType.Char, char: '0' },
+                        { type: ASTNodeType.Char, char: '1' },
+                    ],
+                },
+            },
+            { type: ASTNodeType.Char, char: '0' },
+            { type: ASTNodeType.Char, char: '0' },
+            { type: ASTNodeType.Char, char: '0' },
+            {
+                type: ASTNodeType.Star,
+                node: {
+                    type: ASTNodeType.Union,
+                    nodes: [
+                        { type: ASTNodeType.Char, char: '0' },
+                        { type: ASTNodeType.Char, char: '1' },
+                    ],
+                },
+            },
+        ],
+    });
 });
 
 Deno.test('b(a+b)*b', () => {
@@ -95,6 +131,25 @@ Deno.test('b(a+b)*b', () => {
                 },
             },
             { type: ParserNodeType.Char, char: 'b' },
+        ],
+    });
+
+    const simplified = simplifyAST(parsed);
+    assertEquals(simplified, {
+        type: ASTNodeType.Concat,
+        nodes: [
+            { type: ASTNodeType.Char, char: 'b' },
+            {
+                type: ASTNodeType.Star,
+                node: {
+                    type: ASTNodeType.Union,
+                    nodes: [
+                        { type: ASTNodeType.Char, char: 'a' },
+                        { type: ASTNodeType.Char, char: 'b' },
+                    ],
+                },
+            },
+            { type: ASTNodeType.Char, char: 'b' },
         ],
     });
 });
@@ -130,6 +185,29 @@ Deno.test('a + ab + abb', () => {
                 ],
             },
         },
+    });
+
+    const simplified = simplifyAST(parsed);
+    assertEquals(simplified, {
+        type: ASTNodeType.Union,
+        nodes: [
+            { type: ASTNodeType.Char, char: 'a' },
+            {
+                type: ASTNodeType.Concat,
+                nodes: [
+                    { type: ASTNodeType.Char, char: 'a' },
+                    { type: ASTNodeType.Char, char: 'b' },
+                ],
+            },
+            {
+                type: ASTNodeType.Concat,
+                nodes: [
+                    { type: ASTNodeType.Char, char: 'a' },
+                    { type: ASTNodeType.Char, char: 'b' },
+                    { type: ASTNodeType.Char, char: 'b' },
+                ],
+            },
+        ],
     });
 });
 
@@ -185,6 +263,29 @@ Deno.test('a + (ab) + (abb)', () => {
                 isClosed: true,
             },
         },
+    });
+
+    const simplified = simplifyAST(parsed);
+    assertEquals(simplified, {
+        type: ASTNodeType.Union,
+        nodes: [
+            { type: ASTNodeType.Char, char: 'a' },
+            {
+                type: ASTNodeType.Concat,
+                nodes: [
+                    { type: ASTNodeType.Char, char: 'a' },
+                    { type: ASTNodeType.Char, char: 'b' },
+                ],
+            },
+            {
+                type: ASTNodeType.Concat,
+                nodes: [
+                    { type: ASTNodeType.Char, char: 'a' },
+                    { type: ASTNodeType.Char, char: 'b' },
+                    { type: ASTNodeType.Char, char: 'b' },
+                ],
+            },
+        ],
     });
 });
 
@@ -249,6 +350,32 @@ Deno.test('(a + (ab) + (abb))*', () => {
                 },
             },
             isClosed: true,
+        },
+    });
+
+    const simplified = simplifyAST(parsed);
+    assertEquals(simplified, {
+        type: ASTNodeType.Star,
+        node: {
+            type: ASTNodeType.Union,
+            nodes: [
+                { type: ASTNodeType.Char, char: 'a' },
+                {
+                    type: ASTNodeType.Concat,
+                    nodes: [
+                        { type: ASTNodeType.Char, char: 'a' },
+                        { type: ASTNodeType.Char, char: 'b' },
+                    ],
+                },
+                {
+                    type: ASTNodeType.Concat,
+                    nodes: [
+                        { type: ASTNodeType.Char, char: 'a' },
+                        { type: ASTNodeType.Char, char: 'b' },
+                        { type: ASTNodeType.Char, char: 'b' },
+                    ],
+                },
+            ],
         },
     });
 });
@@ -318,6 +445,38 @@ Deno.test('(a + b)*b(a + b)(a + b)', () => {
             },
         ],
     });
+
+    const simplified = simplifyAST(parsed);
+    assertEquals(simplified, {
+        type: ASTNodeType.Concat,
+        nodes: [
+            {
+                type: ASTNodeType.Star,
+                node: {
+                    type: ASTNodeType.Union,
+                    nodes: [
+                        { type: ASTNodeType.Char, char: 'a' },
+                        { type: ASTNodeType.Char, char: 'b' },
+                    ],
+                },
+            },
+            { type: ASTNodeType.Char, char: 'b' },
+            {
+                type: ASTNodeType.Union,
+                nodes: [
+                    { type: ASTNodeType.Char, char: 'a' },
+                    { type: ASTNodeType.Char, char: 'b' },
+                ],
+            },
+            {
+                type: ASTNodeType.Union,
+                nodes: [
+                    { type: ASTNodeType.Char, char: 'a' },
+                    { type: ASTNodeType.Char, char: 'b' },
+                ],
+            },
+        ],
+    });
 });
 
 Deno.test('(a+b)(a+b)', () => {
@@ -353,6 +512,27 @@ Deno.test('(a+b)(a+b)', () => {
             },
         ],
     });
+
+    const simplified = simplifyAST(parsed);
+    assertEquals(simplified, {
+        type: ASTNodeType.Concat,
+        nodes: [
+            {
+                type: ASTNodeType.Union,
+                nodes: [
+                    { type: ASTNodeType.Char, char: 'a' },
+                    { type: ASTNodeType.Char, char: 'b' },
+                ],
+            },
+            {
+                type: ASTNodeType.Union,
+                nodes: [
+                    { type: ASTNodeType.Char, char: 'a' },
+                    { type: ASTNodeType.Char, char: 'b' },
+                ],
+            },
+        ],
+    });
 });
 
 Deno.test('(a + b) ( a + b )', () => {
@@ -385,6 +565,27 @@ Deno.test('(a + b) ( a + b )', () => {
                     sndNode: { type: ParserNodeType.Char, char: 'b' },
                 },
                 isClosed: true,
+            },
+        ],
+    });
+
+    const simplified = simplifyAST(parsed);
+    assertEquals(simplified, {
+        type: ASTNodeType.Concat,
+        nodes: [
+            {
+                type: ASTNodeType.Union,
+                nodes: [
+                    { type: ASTNodeType.Char, char: 'a' },
+                    { type: ASTNodeType.Char, char: 'b' },
+                ],
+            },
+            {
+                type: ASTNodeType.Union,
+                nodes: [
+                    { type: ASTNodeType.Char, char: 'a' },
+                    { type: ASTNodeType.Char, char: 'b' },
+                ],
             },
         ],
     });
@@ -471,6 +672,37 @@ Deno.test('(( a + (a + b) + b)* (a + b))', () => {
         },
         isClosed: true,
     });
+
+    const simplified = simplifyAST(parsed);
+    assertEquals(simplified, {
+        type: ASTNodeType.Concat,
+        nodes: [
+            {
+                type: ASTNodeType.Star,
+                node: {
+                    type: ASTNodeType.Union,
+                    nodes: [
+                        { type: ASTNodeType.Char, char: 'a' },
+                        {
+                            type: ASTNodeType.Union,
+                            nodes: [
+                                { type: ASTNodeType.Char, char: 'a' },
+                                { type: ASTNodeType.Char, char: 'b' },
+                            ],
+                        },
+                        { type: ASTNodeType.Char, char: 'b' },
+                    ],
+                },
+            },
+            {
+                type: ASTNodeType.Union,
+                nodes: [
+                    { type: ASTNodeType.Char, char: 'a' },
+                    { type: ASTNodeType.Char, char: 'b' },
+                ],
+            },
+        ],
+    });
 });
 
 Deno.test('(a + b)*abb', () => {
@@ -503,6 +735,26 @@ Deno.test('(a + b)*abb', () => {
             { type: ParserNodeType.Char, char: 'b' },
         ],
     });
+
+    const simplified = simplifyAST(parsed);
+    assertEquals(simplified, {
+        type: ASTNodeType.Concat,
+        nodes: [
+            {
+                type: ASTNodeType.Star,
+                node: {
+                    type: ASTNodeType.Union,
+                    nodes: [
+                        { type: ASTNodeType.Char, char: 'a' },
+                        { type: ASTNodeType.Char, char: 'b' },
+                    ],
+                },
+            },
+            { type: ASTNodeType.Char, char: 'a' },
+            { type: ASTNodeType.Char, char: 'b' },
+            { type: ASTNodeType.Char, char: 'b' },
+        ],
+    });
 });
 
 Deno.test('a*b*c*', () => {
@@ -526,6 +778,25 @@ Deno.test('a*b*c*', () => {
             {
                 type: ParserNodeType.Star,
                 node: { type: ParserNodeType.Char, char: 'c' },
+            },
+        ],
+    });
+
+    const simplified = simplifyAST(parsed);
+    assertEquals(simplified, {
+        type: ASTNodeType.Concat,
+        nodes: [
+            {
+                type: ASTNodeType.Star,
+                node: { type: ASTNodeType.Char, char: 'a' },
+            },
+            {
+                type: ASTNodeType.Star,
+                node: { type: ASTNodeType.Char, char: 'b' },
+            },
+            {
+                type: ASTNodeType.Star,
+                node: { type: ASTNodeType.Char, char: 'c' },
             },
         ],
     });
